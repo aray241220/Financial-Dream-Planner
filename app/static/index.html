@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Financial Goal Planner &amp; Salary Growth Predictor</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="hero">
+    <h1>AI Financial Goal Planner</h1>
+    <p class="tagline">Salary growth prediction &amp; goal feasibility for freshers &mdash; Marriage, Car &amp; Home.</p>
+  </header>
+
+  <main class="layout">
+    <!-- Input form -->
+    <section class="card form-card">
+      <h2>Your details</h2>
+      <form id="plan-form" novalidate>
+        <div class="grid">
+          <label>Name
+            <input type="text" name="name" required maxlength="100" placeholder="e.g. Riya" />
+          </label>
+          <label>Age
+            <input type="number" name="age" required min="18" max="65" value="26" />
+          </label>
+          <label>City
+            <select name="city" required></select>
+          </label>
+          <label>Area type
+            <select name="area_type" required></select>
+          </label>
+          <label>Current / expected monthly salary (&#8377;)
+            <input type="number" name="monthly_salary" required min="1" step="500" value="40000" />
+          </label>
+          <label>Saving / investment (%)
+            <input type="number" name="saving_percentage" required min="0" max="100" step="1" value="30" />
+          </label>
+          <label>Marriage timeline (years)
+            <input type="number" name="marriage_years" required min="1" max="50" value="3" />
+          </label>
+          <label>Car timeline (years)
+            <input type="number" name="car_years" required min="1" max="50" value="5" />
+          </label>
+          <label>Home timeline (years)
+            <input type="number" name="home_years" required min="1" max="50" value="10" />
+          </label>
+        </div>
+        <button type="submit" id="submit-btn">Build my plan</button>
+        <p id="form-error" class="error" hidden></p>
+      </form>
+    </section>
+
+    <!-- Results -->
+    <section id="results" class="results" hidden>
+      <div id="summary-banner" class="card summary">
+        <span id="feasibility-badge" class="badge"></span>
+        <p id="summary-text"></p>
+      </div>
+
+      <div class="stats">
+        <div class="card stat"><span class="stat-label">Predicted salary (in 5 years)</span><span id="predicted-salary" class="stat-value"></span></div>
+        <div class="card stat"><span class="stat-label">Monthly saving capacity</span><span id="capacity" class="stat-value"></span></div>
+        <div class="card stat"><span class="stat-label">Combined monthly SIP needed</span><span id="combined-sip" class="stat-value"></span></div>
+        <div class="card stat"><span class="stat-label">Surplus / shortfall</span><span id="surplus" class="stat-value"></span></div>
+      </div>
+
+      <h2 class="goals-title">Goal breakdown</h2>
+      <div id="goal-cards" class="goal-cards"></div>
+
+      <p id="disclaimer" class="disclaimer"></p>
+    </section>
+  </main>
+
+  <script src="/script.js"></script>
+</body>
+</html>

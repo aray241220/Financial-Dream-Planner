@@ -1,0 +1,16 @@
+# Web framework + server
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.29,<1.0
+
+# Data + ML
+pandas>=2.0,<3.0
+numpy>=1.26,<3.0
+scikit-learn>=1.4,<2.0
+joblib>=1.3,<2.0
+
+# Validation
+pydantic>=2.6,<3.0
+
+# Testing
+pytest>=8.0,<9.0
+httpx>=0.27,<1.0

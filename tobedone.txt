@@ -1,0 +1,271 @@
+============================================================
+AI-POWERED FINANCIAL GOAL PLANNER & SALARY GROWTH PREDICTOR
+TO-BE-DONE / PROJECT TRACKER
+============================================================
+Last updated: 2026-08-30
+Status: COMPLETE (Option C spec-aligned; all 15 steps done, 24 tests pass)
+
+------------------------------------------------------------
+1. PROJECT SUMMARY
+------------------------------------------------------------
+A fully local, beginner-friendly academic project that:
+- Predicts a fresher's FUTURE SALARY using ML.
+- Projects inflation-adjusted costs for 3 goals: Marriage, Car, Home.
+- Computes required monthly SIP investment per goal.
+- Reports savings capacity, surplus/shortfall and feasibility.
+- Serves a clean dashboard via FastAPI.
+
+Stack: Python, FastAPI, pandas, NumPy, scikit-learn, Joblib,
+HTML/CSS/JavaScript. No RAG, no paid APIs, no cloud.
+
+------------------------------------------------------------
+2. HARD CONSTRAINTS (MUST HONOR)
+------------------------------------------------------------
+[ ] No RAG, paid APIs, or cloud services.
+[ ] EXPERIENCE is NOT a feature (all users are freshers).
+[ ] ML target = Future Salary (5-yr). Features = Age, City, Current
+    Salary (City one-hot). Trained on synthetic salary_growth.csv
+    (generated + documented). Experience not used.
+[ ] City encoded properly (OneHotEncoder inside sklearn Pipeline).
+[ ] Fixed random_state for train/test split.
+[ ] Two models: Linear Regression + Decision Tree Regressor.
+[ ] Evaluate with MAE and R2.
+[ ] Selection rule: lower MAE first, higher R2 as tie-breaker.
+[ ] Save pipeline with Joblib; load once, never retrain per request.
+[ ] Inflation fixed 6%: Future Cost = Current Cost * (1.06)^Years.
+[ ] No hard-coded city costs (read from CSV).
+[ ] No fake ML accuracy, no guaranteed financial claims.
+[ ] Include educational-simulation disclaimer everywhere relevant.
+
+------------------------------------------------------------
+3. DOCUMENTED ASSUMPTIONS (DEFAULTS)
+------------------------------------------------------------
+A. Salary basis: model predicts 5-YEAR Future Salary from Age, City,
+   Current Salary (trained on synthetic salary_growth.csv). Per-goal
+   salary uses the implied CAGR (current -> predicted future over
+   5 yrs). Capacity uses the user's CURRENT salary.
+B. Investment return: 12% annual (assumption, not guarantee).
+   monthly rate i = 0.12/12; months n = years * 12.
+   Contribution timing: start of month (annuity-due).
+C. Required SIP (solve annuity-due FV for P):
+   P = (FV * i) / (((1+i)^n - 1) * (1+i))
+D. Saving capacity = user's Current Salary * Saving% (matches the
+   spec example; no double-counting with predicted future salary).
+E. Feasibility thresholds:
+   - Surplus >= 0                 -> Achievable
+   - Shortfall <= 25% of capacity -> Challenging
+   - Larger shortfall             -> Highly Challenging
+F. City costs carry an Area_Type dimension (10 types/city). DECISION:
+   default to a single area type (e.g., "Central") unless the user
+   selects one; costs always read from CSV (never hard-coded).
+
+------------------------------------------------------------
+4. USER INPUTS
+------------------------------------------------------------
+Name, Age, City, Area Type (optional; default Central),
+Current/Expected Monthly Salary,
+Marriage timeline (yrs), Car timeline (yrs), Home timeline (yrs),
+Salary saving/investment percentage.
+
+------------------------------------------------------------
+5. DATASETS  (in data/)
+------------------------------------------------------------
+data/salary_data.csv     -> Age, City, Education, Job_Role, Monthly_Salary
+                            (provided source; 100 rows, no Future Salary).
+data/salary_growth.csv   -> Age, City, Current Salary, Future Salary
+                            TRAINING set. Future Salary is SYNTHETIC (5-yr,
+                            city/age-varied CAGR + noise) built by
+                            data/generate_salary_growth.py. Illustrative.
+data/city_goal_costs.csv -> City, Area_Type, Marriage_Cost_Current,
+                            Car_Cost_Current, Home_Cost_Current
+                            100 rows = 10 cities x 10 area types.
+Cities (all files match): Ahmedabad, Bangalore, Chennai, Delhi,
+   Hyderabad, Jaipur, Kolkata, Lucknow, Mumbai, Pune.
+
+------------------------------------------------------------
+6. PROPOSED FOLDER STRUCTURE
+------------------------------------------------------------
+Assignment/
+  app/
+    main.py            FastAPI app + POST /plan + static serving
+    schemas.py         Pydantic request/response models
+    config.py          constants (inflation, return, horizon, thresholds)
+    ml/
+      train.py         preprocess, split, train, eval, select, save
+      predictor.py     load joblib pipeline, predict salary
+    core/
+      inflation.py     future cost
+      investment.py    SIP required + capacity
+      feasibility.py   classification
+      planner.py       orchestrates full plan
+    static/            index.html, style.css, script.js
+  data/
+    salary_growth.csv
+    city_goal_costs.csv
+  models/              salary_model.joblib (generated)
+  tests/               test_inflation, test_investment, test_feasibility, test_api
+  docs/                architecture / DFD (Mermaid)
+  requirements.txt
+  README.md
+  PROJECT_REPORT.md
+  tobedone.txt         (this file)
+
+------------------------------------------------------------
+7. TODO LIST
+------------------------------------------------------------
+[x] Step 1:  Scaffold folder structure and requirements.txt
+[x] Step 2:  Datasets PROVIDED in data/ (salary_data.csv,
+             city_goal_costs.csv). Verified 10 matching cities.
+[x] Step 2b: Folded into Steps 4/6 -- salary loader (drops blank
+             trailing column) lives in train.py; cost loading +
+             Area_Type handling go in core (Step 6).
+[x] Step 3:  config.py built with documented constants, paths,
+             feature list, and assumptions.
+[x] Step 4:  ML train.py done. OneHotEncoder pipeline, split
+             (random_state=42), LR + DecisionTree, MAE/R2, select
+             lower-MAE, saved joblib. Selected LinearRegression
+             (MAE 8597.81, R2 0.867).
+[x] Step 5:  predictor.py done. Cached single model load,
+             predict_salary(age,city,education,job_role), and
+             get_feature_categories() from the fitted encoder.
+[x] Step 6:  core modules done: inflation.py (6% future cost),
+             investment.py (annuity-due SIP + saving capacity),
+             feasibility.py (3-way classification). Verified.
+[x] Step 7:  planner.py done. Loads costs (city+Area_Type), predicts
+             salary, projects 8% growth, inflates costs, per-goal SIP,
+             capacity, surplus/shortfall, feasibility + summary.
+[x] Step 8:  schemas.py done. PlanRequest (bounds + category checks
+             vs model/cost data, friendly errors), GoalBreakdown +
+             PlanResponse. planner adds get_cities/get_area_types.
+[x] Step 9:  FastAPI main.py done. POST /plan (400 on ValueError,
+             503 if model missing), GET /meta (dropdowns), GET
+             /health, static dashboard mounted at /. Verified.
+[x] Step 10: Frontend dashboard done. static/index.html, style.css,
+             script.js. Fetches /meta for dropdowns, POSTs /plan,
+             renders salary/capacity/SIP stats, 3 goal cards, INR
+             formatting, feasibility badge + disclaimer. Verified in
+             browser end-to-end.
+[x] Step 11: Tests done. test_inflation, test_investment (incl.
+             annuity-due round-trip), test_feasibility (band edges),
+             test_api (health/meta/plan + 422 cases). 24 passed.
+[x] Step 12: Model regenerated from clean state (deleted joblib,
+             re-ran train.py). Deterministic (MAE 8597.81, R2 0.867);
+             fresh model predicts + all 24 tests pass.
+[x] Step 13: README.md done. Overview, structure, install, train,
+             run, API examples (/plan, /meta, /health), how-it-works
+             (formulas + assumptions), tests, troubleshooting.
+[x] Step 14: PROJECT_REPORT.md done. Architecture + DFD (Mermaid),
+             modules, ML + finance methodology, assumptions, API,
+             testing, requirement checklist (constraint -> code),
+             limitations, disclaimer.
+[x] Step 15: End-to-end done. Clean model regen (reproducible, LR MAE
+             3806.94/R2 0.986), pytest 24 passed, browser flow OK,
+             edge cases (age 18/65/66, saving 0/100/101, bad city/
+             area) all behave correctly.
+
+------------------------------------------------------------
+8. API CONTRACT (DRAFT)
+------------------------------------------------------------
+POST /plan
+Request (JSON): name, age, city, area_type (optional), monthly_salary,
+  marriage_years, car_years, home_years, saving_percentage
+Response (JSON): current + predicted future (5-yr) salary, horizon,
+  per-goal current/future cost, per-goal required SIP, combined
+  requirement, saving capacity, surplus/shortfall, feasibility, summary.
+
+------------------------------------------------------------
+9. OPEN QUESTIONS / DECISIONS TO CONFIRM
+------------------------------------------------------------
+[x] REALIGNED to spec (Option C): target = Future Salary (5-yr);
+    features = Age, City, Current Salary; Education/Job_Role dropped.
+[x] Future Salary is SYNTHETIC (generated, documented, illustrative).
+[x] Per-goal salary via implied CAGR; capacity from Current Salary.
+[x] Area_Type: default "Central", user may override. CONFIRMED.
+[ ] Confirm 12% annual return, annuity-due timing.
+[ ] Confirm feasibility thresholds (0% / 25% bands).
+[ ] City list is FIXED by data: Ahmedabad, Bangalore, Chennai, Delhi,
+    Hyderabad, Jaipur, Kolkata, Lucknow, Mumbai, Pune.
+
+------------------------------------------------------------
+10. CHANGE LOG (append newest at top)
+------------------------------------------------------------
+2026-08-30  Step 15 done. Clean regen + full verification: pytest 24
+            passed; edge cases (age/saving bounds, invalid city/area)
+            correct; Achievable + Highly Challenging paths confirmed.
+            Updated README + PROJECT_REPORT for Option C. PROJECT
+            COMPLETE.
+2026-08-30  OPTION C realign to capstone spec. Generated synthetic
+            salary_growth.csv (data/generate_salary_growth.py); model
+            now predicts 5-yr FUTURE SALARY from Age, City, Current
+            Salary (LR MAE 3806.94, R2 0.986). Dropped Education/
+            Job_Role from model, inputs, API, UI. Per-goal salary via
+            implied CAGR; capacity from user salary. Updated config/
+            train/predictor/planner/schemas/main/frontend/tests/docs.
+            pytest 24 passed; browser verified.
+2026-08-30  Step 14 done. PROJECT_REPORT.md: Mermaid architecture +
+            DFD, module table, ML methodology (metrics), finance
+            formulas, assumptions table, API summary, testing,
+            requirement checklist mapping each constraint to code,
+            limitations + disclaimer.
+2026-08-30  Step 13 done. README.md: overview + disclaimer, project
+            structure, install/train/run commands, /plan + /meta +
+            /health API examples, how-it-works (formulas/assumptions),
+            pytest instructions, troubleshooting.
+2026-08-30  Step 12 done. Deleted models/salary_model.joblib and
+            retrained cleanly -- reproducible (same MAE/R2 due to
+            fixed random_state). Fresh model predicts 46391.64;
+            pytest 24 passed.
+2026-08-30  Step 11 done. tests/: test_inflation, test_investment
+            (round-trip FV check, 0-year guard), test_feasibility
+            (25% boundary edges), test_api (TestClient: health, meta,
+            happy path, combined=sum, and 5 validation 422s).
+            pytest: 24 passed.
+2026-08-30  Step 10 done. app/static dashboard (index.html, style.css,
+            script.js): loads /meta dropdowns, POSTs /plan, renders
+            feasibility badge, stat cards, 3 goal cards (INR en-IN),
+            surplus/shortfall colouring, disclaimer. Browser-verified
+            full flow (server logs 200 for /, css, js, /meta, /plan).
+2026-08-30  Step 9 done. app/main.py FastAPI: POST /plan (->PlanResponse,
+            ValueError->400, model-missing->503), GET /meta (option
+            lists), GET /health, StaticFiles mounted at /. TestClient
+            verified: valid 200, invalid 422 w/ messages, /docs +
+            /openapi still 200.
+2026-08-30  Step 8 done. app/schemas.py: PlanRequest with numeric
+            bounds and category validation (city/education/job_role/
+            area_type checked against known values, helpful list in
+            error). GoalBreakdown + PlanResponse. Added planner
+            get_cities()/get_area_types() for validation + UI.
+2026-08-30  Step 7 done. core/planner.py orchestrates end-to-end
+            (cost loader by city+Area_Type folds in rest of 2b).
+            Verified Achievable + Highly Challenging cases and a
+            clear ValueError on unknown city/area.
+2026-08-30  Step 6 done. core/inflation.py, core/investment.py
+            (annuity-due SIP, 0-year guard, capacity), core/
+            feasibility.py (0% / 25% bands). Verified: 1.06^5
+            inflation, SIP=12123.22 for 1M/5y, band edges.
+2026-08-30  Step 5 done. app/ml/predictor.py: lru_cache single
+            model load (never retrains), predict_salary(...), and
+            get_feature_categories() (10 cities, 8 educations,
+            10 job roles) for later validation/UI dropdowns.
+2026-08-30  Step 4 done. Built app/ml/train.py (OneHotEncoder in a
+            Pipeline, 80/20 split random_state=42, LinearRegression +
+            DecisionTree, MAE/R2, lower-MAE selection). Trained and
+            saved models/salary_model.joblib; LinearRegression won
+            (MAE 8597.81, R2 0.867). Step 2b folded in.
+2026-08-30  Locked decisions: features = Age, City, Education,
+            Job_Role; salary growth 8%/yr over each goal timeline;
+            Area_Type default Central (overridable). Education +
+            Job_Role added to user inputs / API. Built config.py
+            (Step 3): paths, ML settings, financial assumptions,
+            feasibility threshold, disclaimer.
+2026-08-30  Reconciled tracker with PROVIDED data. salary_data.csv
+            has no Future Salary (target = current Monthly_Salary;
+            future via growth assumption); extra Education/Job_Role
+            cols; costs file adds Area_Type. Updated datasets,
+            constraints, assumptions, inputs, TODO, open questions.
+2026-08-30  Step 1 done. Scaffolded folders (app/ml, app/core,
+            app/static, data, models, tests, docs), added package
+            __init__.py files and requirements.txt.
+2026-08-30  Created tracker. Captured plan, constraints,
+            assumptions, folder structure, and 15-step TODO.
+============================================================
