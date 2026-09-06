@@ -1,7 +1,7 @@
-"""Load the trained salary pipeline once and predict 5-year future salary.
+"""Serve predictions from the persisted salary pipeline.
 
-The pipeline is loaded a single time (cached) and reused for every request; it
-is never retrained here.
+The joblib artifact is read once (memoized with lru_cache) and reused for every
+call; nothing here ever fits a model.
 """
 from __future__ import annotations
 
@@ -15,28 +15,28 @@ from app import config
 
 @lru_cache(maxsize=1)
 def get_model():
-    """Load and cache the trained pipeline (loaded once, reused)."""
+    """Load the fitted pipeline from disk on first use, then keep it cached."""
     if not config.MODEL_PATH.exists():
         raise FileNotFoundError(
-            f"Model not found at {config.MODEL_PATH}. "
-            "Train it first with: python -m app.ml.train"
+            f"No trained model at {config.MODEL_PATH}. "
+            "Build one first with `python -m app.ml.train`."
         )
     return joblib.load(config.MODEL_PATH)
 
 
 def predict_future_salary(age: int, city: str, current_salary: float) -> float:
-    """Predict the 5-year future monthly salary for a fresher profile."""
-    row = pd.DataFrame(
+    """Return the model's 5-year future monthly-salary estimate for one profile."""
+    one_row = pd.DataFrame(
         [{"Age": age, "City": city, "Current Salary": current_salary}],
         columns=config.FEATURE_COLUMNS,
     )
-    return float(get_model().predict(row)[0])
+    return float(get_model().predict(one_row)[0])
 
 
 def get_feature_categories() -> dict[str, list[str]]:
-    """Known category values per categorical feature, from the fitted encoder."""
-    encoder = get_model().named_steps["preprocess"].named_transformers_["cat"]
+    """Map each categorical feature to the values the fitted encoder learned."""
+    fitted = get_model().named_steps["preprocess"].named_transformers_["cat"]
     return {
-        feature: sorted(categories.tolist())
-        for feature, categories in zip(config.CATEGORICAL_FEATURES, encoder.categories_)
+        column: sorted(values.tolist())
+        for column, values in zip(config.CATEGORICAL_FEATURES, fitted.categories_)
     }

@@ -1,10 +1,15 @@
-"""Train, evaluate and select the salary-prediction model, then save it.
+"""Fit two regressors on the salary-growth data, compare them, keep the winner.
 
-Predicts 5-year Future Salary from Age, City, Current Salary.
-Selection rule: lower MAE wins; higher R2 breaks ties.
+Target: 5-year Future Salary. Inputs: Age, City, Current Salary.
+Winner rule: smallest MAE; a larger R2 breaks ties. The chosen pipeline is
+persisted with joblib so the API can load it once and reuse it.
+
 Run:  python -m app.ml.train
 """
 from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Iterator
 
 import joblib
 import pandas as pd
@@ -19,67 +24,67 @@ from sklearn.tree import DecisionTreeRegressor
 from app import config
 
 
-def load_salary_data() -> pd.DataFrame:
-    """Load salary_growth.csv (Age, City, Current Salary, Future Salary)."""
-    df = pd.read_csv(config.SALARY_GROWTH_CSV)
-    df = df.loc[:, ~df.columns.str.startswith("Unnamed")]
-    df.columns = df.columns.str.strip()
-    return df
+@dataclass(frozen=True)
+class Scored:
+    """A fitted pipeline together with its held-out scores."""
+
+    name: str
+    mae: float
+    r2: float
+    pipeline: Pipeline
 
 
-def build_pipeline(regressor) -> Pipeline:
-    """Wrap preprocessing + regressor so categoricals are one-hot encoded."""
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("cat", OneHotEncoder(handle_unknown="ignore"), config.CATEGORICAL_FEATURES),
-        ],
-        remainder="passthrough",  # keeps numeric Age
+def read_training_frame() -> pd.DataFrame:
+    """Read salary_growth.csv and discard any stray blank columns."""
+    frame = pd.read_csv(config.SALARY_GROWTH_CSV)
+    frame = frame.loc[:, ~frame.columns.str.startswith("Unnamed")]
+    frame.columns = frame.columns.str.strip()
+    return frame
+
+
+def assemble_pipeline(regressor) -> Pipeline:
+    """One-hot encode the categorical column(s); pass numerics straight through."""
+    prep = ColumnTransformer(
+        [("cat", OneHotEncoder(handle_unknown="ignore"), config.CATEGORICAL_FEATURES)],
+        remainder="passthrough",
     )
-    return Pipeline([("preprocess", preprocessor), ("model", regressor)])
+    return Pipeline([("preprocess", prep), ("model", regressor)])
 
 
-def evaluate(pipeline: Pipeline, X_test, y_test) -> tuple[float, float]:
-    preds = pipeline.predict(X_test)
-    return mean_absolute_error(y_test, preds), r2_score(y_test, preds)
+def candidate_models() -> Iterator[tuple[str, object]]:
+    """Yield the regressors under comparison as (label, fresh estimator)."""
+    yield "LinearRegression", LinearRegression()
+    yield "DecisionTree", DecisionTreeRegressor(random_state=config.RANDOM_STATE)
 
 
-def select_better(results: dict) -> str:
-    """Lower MAE wins; higher R2 breaks ties."""
-    return min(results, key=lambda name: (results[name]["mae"], -results[name]["r2"]))
+def run() -> Scored:
+    """Train, score, pick, and persist the better model; return the winner."""
+    frame = read_training_frame()
+    inputs = frame[config.FEATURE_COLUMNS]
+    target = frame[config.TARGET_COLUMN]
 
-
-def train_and_select() -> tuple[str, float, float]:
-    df = load_salary_data()
-    X = df[config.FEATURE_COLUMNS]
-    y = df[config.TARGET_COLUMN]
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=config.TEST_SIZE, random_state=config.RANDOM_STATE
+    x_train, x_test, y_train, y_test = train_test_split(
+        inputs, target, test_size=config.TEST_SIZE, random_state=config.RANDOM_STATE
     )
 
-    candidates = {
-        "LinearRegression": LinearRegression(),
-        "DecisionTree": DecisionTreeRegressor(random_state=config.RANDOM_STATE),
-    }
+    scored: list[Scored] = []
+    for label, regressor in candidate_models():
+        pipe = assemble_pipeline(regressor).fit(x_train, y_train)
+        predictions = pipe.predict(x_test)
+        mae = mean_absolute_error(y_test, predictions)
+        r2 = r2_score(y_test, predictions)
+        scored.append(Scored(label, mae, r2, pipe))
+        print(f"  {label:<16} MAE {mae:>12,.2f}   R2 {r2:>6.3f}")
 
-    results: dict[str, dict] = {}
-    for name, regressor in candidates.items():
-        pipeline = build_pipeline(regressor)
-        pipeline.fit(X_train, y_train)
-        mae, r2 = evaluate(pipeline, X_test, y_test)
-        results[name] = {"pipeline": pipeline, "mae": mae, "r2": r2}
-        print(f"{name:16s}  MAE={mae:12.2f}  R2={r2:7.3f}")
-
-    best_name = select_better(results)
-    best = results[best_name]
-    print(f"\nSelected: {best_name} (lower MAE, R2 tie-breaker)")
+    # Rank by MAE (ascending); the -R2 term lets a higher R2 win a tie.
+    winner = min(scored, key=lambda s: (s.mae, -s.r2))
+    print(f"\n  -> keeping {winner.name}  (lowest MAE, R2 as tie-break)")
 
     config.MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(best["pipeline"], config.MODEL_PATH)
-    print(f"Saved pipeline -> {config.MODEL_PATH}")
-
-    return best_name, best["mae"], best["r2"]
+    joblib.dump(winner.pipeline, config.MODEL_PATH)
+    print(f"  saved model -> {config.MODEL_PATH}")
+    return winner
 
 
 if __name__ == "__main__":
-    train_and_select()
+    run()
